@@ -42,13 +42,10 @@
              margin-bottom: 20px;
         }
         label { /* Adjusted for .input-group */
-            /* display: block; */
-            /* margin: 12px 0 6px; */
             font-weight: bold;
             color: #34495e;
         }
         input {
-            /* width: 100%; */ /* Handled by flex in .input-group */
             padding: 8px;
             border: 1px solid #ccc;
             border-radius: 4px;
@@ -165,6 +162,29 @@
             overflow-y: auto;
             display: none; /* Keep hidden by default */
         }
+        /* Style for text background in SVG */
+         #doorVisualization text {
+            paint-order: stroke;
+            stroke: rgba(255,255,255,0.8); /* White outline */
+            stroke-width: 3px; /* Outline thickness */
+            stroke-linejoin: round;
+            stroke-linecap: round;
+         }
+         /* Dim line text specific styling if needed */
+         #doorVisualization .dim-label text {
+             font-weight: bold;
+             font-size: 10px;
+         }
+         /* Output label specific styling if needed */
+          #doorVisualization .output-label text {
+             font-weight: bold;
+             font-size: 11px;
+         }
+          /* Detail label specific styling */
+           #doorVisualization .detail-label text {
+             font-size: 11px;
+         }
+
     </style>
 </head>
 <body>
@@ -177,21 +197,25 @@
             <!-- Error container at the top -->
             <div id="errorContainer" class="error"></div>
 
+            <!-- Opening Dimensions First -->
             <div class="input-group">
-                <label for="jambHeight">Jamb Height:</label>
-                <input type="text" id="jambHeight" value="81">
+                <label for="openingWidth">Opening Width:</label>
+                <input type="text" id="openingWidth" value="36">
                 <span class="unit">in</span>
             </div>
 
             <div class="input-group">
-                <label for="jambWidth">Jamb Thickness:</label> <!-- Clarified label -->
+                <label for="openingHeight">Opening Height:</label>
+                <input type="text" id="openingHeight" value="80">
+                <span class="unit">in</span>
+            </div>
+
+            <hr style="margin: 15px 0; border: 0; border-top: 1px solid #eee;">
+
+            <!-- Other Inputs -->
+            <div class="input-group">
+                <label for="jambWidth">Jamb Thickness:</label>
                 <input type="text" id="jambWidth" value="5/8">
-                <span class="unit">in</span>
-            </div>
-
-            <div class="input-group">
-                <label for="doorWidth">Opening Width:</label> <!-- Clarified label -->
-                <input type="text" id="doorWidth" value="36">
                 <span class="unit">in</span>
             </div>
 
@@ -240,59 +264,36 @@
         </div>
     </div>
 
-    <!-- Paste the updated JavaScript here -->
     <script>
-        // Parse various forms of measurement input: whole numbers, fractions, mixed numbers, and decimals
+        // --- Helper functions ---
         function parseMeasurement(value) {
-            if (value === null || typeof value === 'undefined') return NaN; // Handle null/undefined
-
-            // First clean the input - trim and convert to string
+            if (value === null || typeof value === 'undefined') return NaN;
             const input = String(value).trim();
-            if (input === "") return 0; // Treat empty string as 0
-
-            // Try to parse as a mixed number (e.g., "2 3/4")
+            if (input === "") return 0;
             if (input.includes(' ') && input.includes('/')) {
                 const parts = input.split(' ');
-                if (parts.length > 1) { // Ensure there's a whole number part and fraction part
+                if (parts.length > 1) {
                     const wholeNumber = parseFloat(parts[0]);
                      if (!isNaN(wholeNumber)) {
-                         // Join remaining parts in case of multiple spaces before fraction
                          const fractionPart = parts.slice(1).join(' ');
                          const fractionValue = parseFraction(fractionPart);
                          if (!isNaN(fractionValue)) {
-                             // Handle potential negative whole numbers correctly with positive fractions
                              return wholeNumber < 0 ? wholeNumber - fractionValue : wholeNumber + fractionValue;
-                         } else {
-                             return NaN; // Invalid fraction part
-                         }
+                         } else { return NaN; }
                      } else {
-                         // Check if the first part itself is a fraction
                          const fractionValue = parseFraction(parts[0]);
-                         if (!isNaN(fractionValue) && parts.length === 1) { // e.g. " 1/2 "
-                             return fractionValue;
-                         }
-                         return NaN; // Invalid whole number part
+                         if (!isNaN(fractionValue) && parts.length === 1) { return fractionValue; }
+                         return NaN;
                      }
                 }
             }
-
-            // Try to parse as a simple fraction (e.g., "3/4")
-            if (input.includes('/') && !input.includes(' ')) { // Ensure no space for simple fraction
-                return parseFraction(input);
-            }
-
-            // Try to parse as a simple number (decimal or integer)
+            if (input.includes('/') && !input.includes(' ')) { return parseFraction(input); }
             const numericValue = parseFloat(input);
-            if (!isNaN(numericValue)) {
-                return numericValue;
-            }
-
-            // If all else fails
-             console.warn(`Could not parse measurement: "${value}"`);
-            return NaN; // Return NaN for unparseable input
+            if (!isNaN(numericValue)) { return numericValue; }
+            console.warn(`Could not parse measurement: "${value}"`);
+            return NaN;
         }
 
-        // Helper function to parse a fraction string like "3/4"
         function parseFraction(fractionStr) {
             const parts = fractionStr.split('/');
             if (parts.length === 2) {
@@ -302,516 +303,213 @@
                     return numerator / denominator;
                 }
             }
-            return NaN; // Return NaN for invalid fractions
+            return NaN;
         }
 
-        // Utility function to convert decimal to fraction string (improved)
         function decimalToFraction(decimal, tolerance = 1 / 64) {
              if (isNaN(decimal)) return "Invalid";
              if (decimal === 0) return "0";
-
              const sign = decimal < 0 ? "-" : "";
              decimal = Math.abs(decimal);
-
              let wholePart = Math.floor(decimal);
              let fracPart = decimal - wholePart;
-
-             if (fracPart < tolerance) {
-                 return sign + wholePart.toString();
-             }
-
-             // Common denominators to check (can be extended)
-             const denominators = [2, 4, 8, 16, 32]; // prioritize common woodworking fractions
-             let bestNum = 1;
-             let bestDen = 1;
-             let minDiff = Infinity;
-
+             if (fracPart < tolerance) { return sign + wholePart.toString(); }
+             const denominators = [2, 4, 8, 16, 32];
+             let bestNum = 1; let bestDen = 1; let minDiff = Infinity;
              for (const den of denominators) {
                  const num = Math.round(fracPart * den);
-                 if (num === 0) continue; // Skip if rounds to zero for this denominator
-
+                 if (num === 0) continue;
                  const diff = Math.abs(fracPart - num / den);
-
                  if (diff < minDiff && diff < tolerance) {
-                     minDiff = diff;
-                     bestNum = num;
-                     bestDen = den;
-                     if (diff < 1e-9) break; // Found a very close match
+                     minDiff = diff; bestNum = num; bestDen = den;
+                     if (diff < 1e-9) break;
                  }
              }
-
-             // Simplify the fraction
              const commonDivisor = getGCD(bestNum, bestDen);
-             const simplifiedNum = bestNum / commonDivisor;
-             const simplifiedDen = bestDen / commonDivisor;
-
-             let fractionString = `${simplifiedNum}/${simplifiedDen}`;
-
-             // If the fraction simplifies to 1/1 (meaning fracPart was very close to 1)
+             let simplifiedNum = bestNum / commonDivisor;
+             let simplifiedDen = bestDen / commonDivisor;
               if (simplifiedNum === simplifiedDen && simplifiedDen !== 0) {
-                 wholePart += 1;
-                 return sign + wholePart.toString(); // Return incremented whole number
+                 wholePart += 1; fracPart = 0; simplifiedNum = 0;
              }
-
-             // Combine whole part and fraction
+             let fractionString = "";
+             if (simplifiedNum !== 0 && simplifiedDen !== 0) {
+                 fractionString = `${simplifiedNum}/${simplifiedDen}`;
+             }
              if (wholePart > 0) {
-                 return `${sign}${wholePart} ${fractionString}`;
-             } else {
+                 return `${sign}${wholePart}${fractionString ? ' ' + fractionString : ''}`;
+             } else if (fractionString) {
                  return sign + fractionString;
-             }
+             } else { return "0"; }
         }
 
+        function getGCD(a, b) { return b === 0 ? a : getGCD(b, Math.abs(a % b)); }
 
-        // Helper function to find Greatest Common Divisor
-        function getGCD(a, b) {
-            return b === 0 ? a : getGCD(b, Math.abs(a % b));
-        }
-
-        // Utility function to format measurements with fractions
         function formatMeasurement(inches) {
-            // Handle potential NaN input from calculations
-             if (isNaN(inches)) {
-                 console.warn("Formatting NaN measurement");
-                 return "--"; // Or return "Error", "NaN"
-             }
+             if (isNaN(inches)) { console.warn("Formatting NaN measurement"); return "--"; }
             return `${decimalToFraction(inches)}"`;
         }
 
-
-        // Main calculation function (Updated as per previous step)
+        // --- Main Calculation Function ---
         function calculateCasingSizes() {
-            const debugInfo = { inputs: {}, parsed: {}, calculations: {} }; // Initialize debug info
+            const debugInfo = { inputs: {}, parsed: {}, calculations: {} };
             try {
-                // Get and parse input values
-                const jambHeightInput = document.getElementById('jambHeight').value;
+                const openingWidthInput = document.getElementById('openingWidth').value;
+                const openingHeightInput = document.getElementById('openingHeight').value;
                 const jambWidthInput = document.getElementById('jambWidth').value;
-                const doorWidthInput = document.getElementById('doorWidth').value;
                 const casingWidthInput = document.getElementById('casingWidth').value;
                 const revealInput = document.getElementById('reveal').value;
-
-                debugInfo.inputs = { jambHeightInput, jambWidthInput, doorWidthInput, casingWidthInput, revealInput };
-
-                const jambHeight = parseMeasurement(jambHeightInput);
-                const jambWidth = parseMeasurement(jambWidthInput); // Needed for vertical calc
-                const doorWidth = parseMeasurement(doorWidthInput); // Assumed to be inner opening width for header calc
+                debugInfo.inputs = { openingWidthInput, openingHeightInput, jambWidthInput, casingWidthInput, revealInput };
+                const openingWidth = parseMeasurement(openingWidthInput);
+                const openingHeight = parseMeasurement(openingHeightInput);
+                const jambWidth = parseMeasurement(jambWidthInput);
                 const casingWidth = parseMeasurement(casingWidthInput);
                 const reveal = parseMeasurement(revealInput);
+                debugInfo.parsed = { openingWidth, openingHeight, jambWidth, casingWidth, reveal };
 
-                debugInfo.parsed = { jambHeight, jambWidth, doorWidth, casingWidth, reveal };
-
-                // Update debug info display
-                // document.getElementById('debugInfo').textContent = JSON.stringify(debugInfo, null, 2);
-
-                // --- Input Validation ---
                 let errors = [];
-                if (isNaN(jambHeight) || jambHeight <= 0) errors.push("Jamb Height must be a positive number.");
-                if (isNaN(jambWidth) || jambWidth < 0) errors.push("Jamb Thickness must be a non-negative number.");
-                if (isNaN(doorWidth) || doorWidth <= 0) errors.push("Opening Width must be a positive number.");
-                if (isNaN(casingWidth) || casingWidth <= 0) errors.push("Casing Width must be a positive number.");
-                if (isNaN(reveal) || reveal < 0) errors.push("Reveal must be a non-negative number.");
-
-                // Check relationships if needed (e.g., reveal < casing width)
-                if (!isNaN(reveal) && !isNaN(casingWidth) && reveal >= casingWidth) {
-                    errors.push("Reveal should typically be less than Casing Width.")
-                }
-
+                 if (isNaN(openingWidth) || openingWidth <= 0) errors.push("Opening Width must be positive.");
+                if (isNaN(openingHeight) || openingHeight <= 0) errors.push("Opening Height must be positive.");
+                if (isNaN(jambWidth) || jambWidth < 0) errors.push("Jamb Thickness must be non-negative.");
+                if (isNaN(casingWidth) || casingWidth <= 0) errors.push("Casing Width must be positive.");
+                if (isNaN(reveal) || reveal < 0) errors.push("Reveal must be non-negative.");
+                if (!isNaN(reveal) && !isNaN(casingWidth) && reveal >= casingWidth) { errors.push("Reveal should be less than Casing Width."); }
 
                 if (errors.length > 0) {
                     document.getElementById('errorContainer').textContent = errors.join(' ');
-                    // Clear previous results on error
                     document.getElementById('leftCasingLength').textContent = '--';
                     document.getElementById('rightCasingLength').textContent = '--';
                     document.getElementById('headerCasingLength').textContent = '--';
-                    document.getElementById('doorVisualization').innerHTML = '<p style="text-align:center; padding-top: 50px; color: #e74c3c;">Inputs invalid, cannot draw visualization.</p>';
+                    document.getElementById('doorVisualization').innerHTML = '<p style="text-align:center; padding-top: 50px; color: #e74c3c;">Inputs invalid, cannot draw.</p>';
                      debugInfo.error = errors.join(' ');
                      document.getElementById('debugInfo').textContent = JSON.stringify(debugInfo, null, 2);
-                    return; // Stop calculation
-                } else {
-                    document.getElementById('errorContainer').textContent = ''; // Clear errors if valid
-                }
+                    return;
+                } else { document.getElementById('errorContainer').textContent = ''; }
 
-                // --- Calculations ---
-
-                // VERTICAL CASING:
-                const verticalShortSide = jambHeight - jambWidth + reveal;
+                const verticalShortSide = openingHeight + reveal;
                 const verticalLongSide = verticalShortSide + casingWidth;
-
-                // HEADER CASING (Long point to long point) - Using corrected logic:
-                const headerShortPointWidth = doorWidth + (reveal * 2);
+                const headerShortPointWidth = openingWidth + (reveal * 2);
                 const headerLongSide = headerShortPointWidth + (casingWidth * 2);
-
-                // Store calculation details
-                debugInfo.calculations = {
-                    verticalShortSide: verticalShortSide,
-                    verticalLongSide: verticalLongSide,
-                    headerShortPointWidth: headerShortPointWidth,
-                    headerLongSide: headerLongSide
-                };
+                debugInfo.calculations = { verticalShortSide, verticalLongSide, headerShortPointWidth, headerLongSide };
                 document.getElementById('debugInfo').textContent = JSON.stringify(debugInfo, null, 2);
-
-                // Display results
                 document.getElementById('leftCasingLength').textContent = formatMeasurement(verticalLongSide);
                 document.getElementById('rightCasingLength').textContent = formatMeasurement(verticalLongSide);
                 document.getElementById('headerCasingLength').textContent = formatMeasurement(headerLongSide);
-
-                // Draw visualization - Pass the calculated header length for consistency
-                drawDoorVisualization(jambHeight, jambWidth, doorWidth, casingWidth, reveal, headerLongSide);
+                drawDoorVisualization(openingWidth, openingHeight, jambWidth, casingWidth, reveal, headerLongSide, verticalLongSide);
 
             } catch (error) {
                 document.getElementById('errorContainer').textContent = 'Calculation error: ' + error.message;
                 console.error("Calculation Error:", error);
-                // Also clear results on unexpected errors
                 document.getElementById('leftCasingLength').textContent = '--';
                 document.getElementById('rightCasingLength').textContent = '--';
                 document.getElementById('headerCasingLength').textContent = '--';
-                 document.getElementById('doorVisualization').innerHTML = '<p style="text-align:center; padding-top: 50px; color: #e74c3c;">An unexpected error occurred during calculation.</p>';
+                 document.getElementById('doorVisualization').innerHTML = '<p style="text-align:center; padding-top: 50px; color: #e74c3c;">Error during calculation.</p>';
                  debugInfo.error = error.message;
                  document.getElementById('debugInfo').textContent = JSON.stringify(debugInfo, null, 2);
             }
         }
 
-
-       // Function to draw the door visualization (Updated as per previous step)
-       function drawDoorVisualization(jambHeight, jambWidth, doorWidth, casingWidth, reveal, calculatedHeaderLongSide) {
+       // --- Visualization Function ---
+       function drawDoorVisualization(openingW, openingH, jambW, casingW, reveal, calculatedHeaderLongSide, calculatedVerticalLongSide) {
             const container = document.getElementById('doorVisualization');
-            container.innerHTML = ''; // Clear previous drawing
-
-            // Basic validation within drawing function too
-            if (isNaN(jambHeight) || isNaN(jambWidth) || isNaN(doorWidth) || isNaN(casingWidth) || isNaN(reveal) || isNaN(calculatedHeaderLongSide) ||
-                jambHeight <= 0 || doorWidth <= 0 || casingWidth <= 0 || calculatedHeaderLongSide <= 0 || jambWidth < 0 || reveal < 0) {
-                 container.innerHTML = '<p style="text-align:center; padding-top: 50px; color: #e74c3c;">Invalid dimensions for visualization.</p>';
-                 return;
+            container.innerHTML = '';
+            if (isNaN(openingW) || isNaN(openingH) || isNaN(jambW) || isNaN(casingW) || isNaN(reveal) ||
+                openingW <= 0 || openingH <= 0 || casingW <= 0 || jambW < 0 || reveal < 0) {
+                 container.innerHTML = '<p style="text-align:center; padding-top: 50px; color: #e74c3c;">Invalid dimensions for visualization.</p>'; return;
             }
-
-
-            // Set up SVG dimensions with some padding
-            const padding = 60; // Increased padding for labels
-            const svgWidth = container.clientWidth || 500; // Use clientWidth or fallback
-            const svgHeight = container.clientHeight || 450; // Use clientHeight or fallback
-
-            // --- Scaling ---
-            // Base the scale on the overall dimensions including casing
-            const overallWidth = doorWidth + (2 * reveal) + (2 * casingWidth); // Match header calculation basis
-            // Approximate vertical extent including top casing and assuming jambHeight is outer height
-            const overallHeight = jambHeight + reveal + casingWidth;
-
-
-             // Ensure overall dimensions are positive before scaling
-            if (overallWidth <= 0 || overallHeight <= 0) {
-                 container.innerHTML = '<p style="text-align:center; padding-top: 50px; color: #e74c3c;">Calculated dimensions result in zero or negative size.</p>';
-                 return;
-            }
-
-            // Calculate scale to fit within the viewbox
-            const scale = Math.min(
-                (svgWidth - padding * 2) / overallWidth,
-                (svgHeight - padding * 2) / overallHeight
-            ) * 0.95; // Use most of the space
-
-
-            // Check if scale is valid
-             if (!isFinite(scale) || scale <= 0) {
-                 console.error("Invalid scale calculated:", scale, { svgWidth, svgHeight, padding, overallWidth, overallHeight });
-                 container.innerHTML = '<p style="text-align:center; padding-top: 50px; color: #e74c3c;">Could not determine appropriate scale for visualization.</p>';
-                 return;
-             }
-
-
-            // Create SVG element
+            const padding = 60;
+            const svgWidth = container.clientWidth || 500; const svgHeight = container.clientHeight || 450;
+            const overallVisualWidth = openingW + 2 * jambW + 2 * reveal + 2 * casingW;
+            const overallVisualHeight = openingH + jambW + reveal + casingW;
+             if (overallVisualWidth <= 0 || overallVisualHeight <= 0) { container.innerHTML = '<p>Calculated visual dimensions invalid.</p>'; return; }
+            const scale = Math.min( (svgWidth - padding * 2) / overallVisualWidth, (svgHeight - padding * 2) / overallVisualHeight ) * 0.95;
+             if (!isFinite(scale) || scale <= 0) { console.error("Invalid scale:", scale); container.innerHTML = '<p>Could not determine scale.</p>'; return; }
+            const scOpeningW = openingW * scale; const scOpeningH = openingH * scale; const scJambW = jambW * scale; const scCasingW = casingW * scale; const scReveal = reveal * scale;
             const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-            svg.setAttribute("width", "100%");
-            svg.setAttribute("height", "100%");
-            // Adjust viewBox centering if needed, here just using calculated size + padding
-            svg.setAttribute("viewBox", `0 0 ${svgWidth} ${svgHeight}`);
+            svg.setAttribute("width", "100%"); svg.setAttribute("height", "100%"); svg.setAttribute("viewBox", `0 0 ${svgWidth} ${svgHeight}`);
+            const drawingWidth = overallVisualWidth * scale; const drawingHeight = overallVisualHeight * scale;
+            const drawOffsetX = (svgWidth - drawingWidth) / 2; const drawOffsetY = svgHeight - padding - drawingHeight;
 
-            // Calculate center point for drawing elements relative to
-             const drawingWidth = overallWidth * scale;
-             const drawingHeight = overallHeight * scale; // Use scaled height for centering
-             const drawOffsetX = (svgWidth - drawingWidth) / 2;
-             const drawOffsetY = (svgHeight - drawingHeight) / 2;
+            const jambOuterLeftX = scCasingW + scReveal; const jambOuterRightX = jambOuterLeftX + scJambW + scOpeningW + scJambW; const jambTopY = scCasingW + scReveal; const jambBottomY = jambTopY + scJambW + scOpeningH;
+            const openingLeftX = jambOuterLeftX + scJambW; const openingRightX = openingLeftX + scOpeningW; const openingTopY = jambTopY + scJambW; const openingBottomY = jambBottomY;
+            const casingInnerLeftX = openingLeftX - scReveal; const casingInnerRightX = openingRightX + scReveal; const casingInnerTopY = openingTopY - scReveal; const casingInnerBottomY = openingBottomY;
+            const casingOuterLeftX = casingInnerLeftX - scCasingW; const casingOuterRightX = casingInnerRightX + scCasingW; const casingOuterTopY = casingInnerTopY - scCasingW; const casingOuterBottomY = casingInnerBottomY;
+            const applyOffset = (x, y) => ({ x: x + drawOffsetX, y: y + drawOffsetY });
 
+            const jambFill = "#EAECEE"; const jambStroke = "#A6ACAF"; const casingFill = "#D6EAF8"; const casingStroke = "#85C1E9"; const revealColor = "#E67E22";
+            function createSVGElement(type, attributes) { const el = document.createElementNS("http://www.w3.org/2000/svg", type); for (const key in attributes) { el.setAttribute(key, attributes[key]); } return el; }
 
-            // --- Calculate coordinates relative to top-left of the drawing area ---
-            const scaledJambH = jambHeight * scale;
-            const scaledJambW = jambWidth * scale;
-            const scaledDoorW = doorWidth * scale;
-            const scaledCasingW = casingWidth * scale;
-            const scaledReveal = reveal * scale;
+            const casingCoords = { topLeftOuter: applyOffset(casingOuterLeftX, casingOuterTopY), topRightOuter: applyOffset(casingOuterRightX, casingOuterTopY), topLeftInner: applyOffset(casingInnerLeftX, casingInnerTopY), topRightInner: applyOffset(casingInnerRightX, casingInnerTopY), bottomLeftOuter: applyOffset(casingOuterLeftX, casingOuterBottomY), bottomLeftInner: applyOffset(casingInnerLeftX, casingInnerBottomY), bottomRightInner: applyOffset(casingInnerRightX, casingInnerBottomY), };
+            svg.appendChild(createSVGElement('path', { d: `M ${casingCoords.bottomLeftInner.x},${casingCoords.bottomLeftInner.y} L ${casingCoords.bottomLeftOuter.x},${casingCoords.bottomLeftOuter.y} L ${casingCoords.topLeftOuter.x},${casingCoords.topLeftOuter.y} L ${casingCoords.topLeftInner.x},${casingCoords.topLeftInner.y} Z`, fill: casingFill, stroke: casingStroke, 'stroke-width': 0.5 }));
+            svg.appendChild(createSVGElement('path', { d: `M ${casingCoords.bottomRightInner.x},${casingCoords.bottomRightInner.y} L ${applyOffset(casingOuterRightX, casingOuterBottomY).x},${applyOffset(casingOuterRightX, casingOuterBottomY).y} L ${casingCoords.topRightOuter.x},${casingCoords.topRightOuter.y} L ${casingCoords.topRightInner.x},${casingCoords.topRightInner.y} Z`, fill: casingFill, stroke: casingStroke, 'stroke-width': 0.5 }));
+            svg.appendChild(createSVGElement('path', { d: `M ${casingCoords.topLeftOuter.x},${casingCoords.topLeftOuter.y} L ${casingCoords.topRightOuter.x},${casingCoords.topRightOuter.y} L ${casingCoords.topRightInner.x},${casingCoords.topRightInner.y} L ${casingCoords.topLeftInner.x},${casingCoords.topLeftInner.y} Z`, fill: casingFill, stroke: casingStroke, 'stroke-width': 0.5 }));
 
-            // Inner Opening Coordinates (relative to drawing area 0,0)
-            const openingX = drawOffsetX + scaledJambW + scaledReveal + scaledCasingW; // Center X of opening
-            const openingY = drawOffsetY + scaledJambW + scaledReveal + scaledCasingW; // Center Y of opening (approx)
+            const jambCoords = { topLeftOuter: applyOffset(jambOuterLeftX, jambTopY), topRightOuter: applyOffset(jambOuterRightX, jambTopY), bottomLeftOuter: applyOffset(jambOuterLeftX, jambBottomY), bottomRightOuter: applyOffset(jambOuterRightX, jambBottomY), topLeftInner: applyOffset(openingLeftX, openingTopY), topRightInner: applyOffset(openingRightX, openingTopY), };
+            svg.appendChild(createSVGElement('rect', { x: jambCoords.topLeftOuter.x, y: jambCoords.topLeftOuter.y, width: jambCoords.topRightOuter.x - jambCoords.topLeftOuter.x, height: scJambW, fill: jambFill, stroke: jambStroke, 'stroke-width': 1 }));
+            svg.appendChild(createSVGElement('rect', { x: jambCoords.topLeftOuter.x, y: jambCoords.topLeftOuter.y, width: scJambW, height: jambCoords.bottomLeftOuter.y - jambCoords.topLeftOuter.y, fill: jambFill, stroke: jambStroke, 'stroke-width': 1 }));
+            svg.appendChild(createSVGElement('rect', { x: jambCoords.topRightInner.x, y: jambCoords.topLeftOuter.y, width: scJambW, height: jambCoords.bottomRightOuter.y - jambCoords.topLeftOuter.y, fill: jambFill, stroke: jambStroke, 'stroke-width': 1 }));
 
-            const openingLeftRel = scaledJambW; // Relative to outer jamb left
-            const openingRightRel = openingLeftRel + scaledDoorW;
-            const openingTopRel = scaledJambW; // Relative to outer jamb top
-            const openingBottomRel = openingTopRel + (scaledJambH - scaledJambW); // Jamb H is outer, so inner height = H - top jamb W
+            const revealLineStrokeWidth = "1.5"; const revealDashArray = "4,3";
+            const revealCoords = { topLeft: casingCoords.topLeftInner, topRight: casingCoords.topRightInner, bottomLeft: casingCoords.bottomLeftInner, bottomRight: casingCoords.bottomRightInner };
+            svg.appendChild(createSVGElement('line', { x1: revealCoords.topLeft.x, y1: revealCoords.topLeft.y, x2: revealCoords.bottomLeft.x, y2: revealCoords.bottomLeft.y, stroke: revealColor, 'stroke-width': revealLineStrokeWidth, 'stroke-dasharray': revealDashArray }));
+            svg.appendChild(createSVGElement('line', { x1: revealCoords.topRight.x, y1: revealCoords.topRight.y, x2: revealCoords.bottomRight.x, y2: revealCoords.bottomRight.y, stroke: revealColor, 'stroke-width': revealLineStrokeWidth, 'stroke-dasharray': revealDashArray }));
+            svg.appendChild(createSVGElement('line', { x1: revealCoords.topLeft.x, y1: revealCoords.topLeft.y, x2: revealCoords.topRight.x, y2: revealCoords.topRight.y, stroke: revealColor, 'stroke-width': revealLineStrokeWidth, 'stroke-dasharray': revealDashArray }));
 
-            // Casing Coordinates (relative to drawing area 0,0)
-            const casingLeftInnerRel = openingLeftRel - scaledReveal;
-            const casingRightInnerRel = openingRightRel + scaledReveal;
-            const casingTopInnerRel = openingTopRel - scaledReveal;
-            const casingBottomOuterRel = openingBottomRel + scaledReveal; // Casing usually goes to floor level + reveal? Or just floor level (jambH)? Let's assume floor level = jambH
+            const outputColor = "#1E8449"; const inputColor = "#C0392B"; const dimLineColor = "#707B7C"; const labelOffset = 12; const dimLineOffset = 30; const textCenterY = (casingCoords.topLeftOuter.y + casingCoords.bottomLeftOuter.y) / 2;
 
-            const casingLeftOuterRel = casingLeftInnerRel - scaledCasingW;
-            const casingRightOuterRel = casingRightInnerRel + scaledCasingW;
-            const casingTopOuterRel = casingTopInnerRel - scaledCasingW;
-
-
-            // Apply the global offset
-             const applyOffset = (x, y) => ({ x: x + drawOffsetX, y: y + drawOffsetY });
-
-             const openingLeft = applyOffset(openingLeftRel, 0).x;
-             const openingRight = applyOffset(openingRightRel, 0).x;
-             const openingTop = applyOffset(0, openingTopRel).y;
-             const openingBottom = applyOffset(0, openingBottomRel).y;
-
-             const casingLeftInner = applyOffset(casingLeftInnerRel, 0).x;
-             const casingRightInner = applyOffset(casingRightInnerRel, 0).x;
-             const casingTopInner = applyOffset(0, casingTopInnerRel).y;
-
-             const casingLeftOuter = applyOffset(casingLeftOuterRel, 0).x;
-             const casingRightOuter = applyOffset(casingRightOuterRel, 0).x;
-             const casingTopOuter = applyOffset(0, casingTopOuterRel).y;
-             const casingBottomOuter = applyOffset(0, scaledJambH).y; // Base on full jamb height scaled
-
-             // Jamb coordinates (outer)
-             const jambOuterLeft = applyOffset(0, 0).x;
-             const jambOuterRight = applyOffset(scaledJambW * 2 + scaledDoorW, 0).x;
-             const jambOuterTop = applyOffset(0, 0).y;
-             const jambOuterBottom = applyOffset(0, scaledJambH).y;
-
-
-            // Draw Jamb Representation (Simplified Box)
-            const jambFill = "#EAECEE"; // Lighter fill
-            const jambStroke = "#A6ACAF"; // Softer stroke
-
-             // Head Jamb
-             const headJamb = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-             headJamb.setAttribute("x", jambOuterLeft);
-             headJamb.setAttribute("y", jambOuterTop);
-             headJamb.setAttribute("width", jambOuterRight - jambOuterLeft);
-             headJamb.setAttribute("height", scaledJambW);
-             headJamb.setAttribute("fill", jambFill);
-             headJamb.setAttribute("stroke", jambStroke);
-             headJamb.setAttribute("stroke-width", "1");
-             svg.appendChild(headJamb);
-
-             // Left Jamb
-             const leftJamb = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-             leftJamb.setAttribute("x", jambOuterLeft);
-             leftJamb.setAttribute("y", jambOuterTop);
-             leftJamb.setAttribute("width", scaledJambW);
-             leftJamb.setAttribute("height", scaledJambH);
-             leftJamb.setAttribute("fill", jambFill);
-             leftJamb.setAttribute("stroke", jambStroke);
-             leftJamb.setAttribute("stroke-width", "1");
-             svg.appendChild(leftJamb);
-
-             // Right Jamb
-             const rightJamb = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-             rightJamb.setAttribute("x", openingRight); // Starts at inner edge right
-             rightJamb.setAttribute("y", jambOuterTop);
-             rightJamb.setAttribute("width", scaledJambW);
-             rightJamb.setAttribute("height", scaledJambH);
-             rightJamb.setAttribute("fill", jambFill);
-             rightJamb.setAttribute("stroke", jambStroke);
-             rightJamb.setAttribute("stroke-width", "1");
-             svg.appendChild(rightJamb);
-
-            // Draw CASING
-            const casingFill = "#AED6F1"; // Lighter blue
-            const casingStroke = "#5DADE2"; // Darker blue stroke
-
-             // LEFT CASING
-            const leftCasingPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            leftCasingPath.setAttribute("d", `M ${casingLeftInner},${casingBottomOuter} L ${casingLeftOuter},${casingBottomOuter} L ${casingLeftOuter},${casingTopOuter} L ${casingLeftInner},${casingTopInner} Z`);
-            leftCasingPath.setAttribute("fill", casingFill);
-            leftCasingPath.setAttribute("stroke", casingStroke);
-            leftCasingPath.setAttribute("stroke-width", "1");
-            svg.appendChild(leftCasingPath);
-
-            // RIGHT CASING
-            const rightCasingPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-             rightCasingPath.setAttribute("d", `M ${casingRightInner},${casingBottomOuter} L ${casingRightOuter},${casingBottomOuter} L ${casingRightOuter},${casingTopOuter} L ${casingRightInner},${casingTopInner} Z`);
-            rightCasingPath.setAttribute("fill", casingFill);
-            rightCasingPath.setAttribute("stroke", casingStroke);
-            rightCasingPath.setAttribute("stroke-width", "1");
-            svg.appendChild(rightCasingPath);
-
-            // TOP CASING (HEADER)
-            const topCasingPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            topCasingPath.setAttribute("d", `M ${casingLeftOuter},${casingTopOuter} L ${casingRightOuter},${casingTopOuter} L ${casingRightInner},${casingTopInner} L ${casingLeftInner},${casingTopInner} Z`);
-            topCasingPath.setAttribute("fill", casingFill);
-            topCasingPath.setAttribute("stroke", casingStroke);
-            topCasingPath.setAttribute("stroke-width", "1");
-            svg.appendChild(topCasingPath);
-
-
-            // Draw REVEAL lines (dashed, from inner opening edge to inner casing edge)
-            const revealColor = "#E67E22";
-            const revealStrokeWidth = "1.5"; // Slightly thicker dashes
-             const revealDashArray = "4,3";
-
-            // Left reveal vertical line
-            const leftRevealLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
-            leftRevealLine.setAttribute("x1", openingLeft); leftRevealLine.setAttribute("y1", openingTop);
-            leftRevealLine.setAttribute("x2", openingLeft); leftRevealLine.setAttribute("y2", openingBottom);
-            leftRevealLine.setAttribute("stroke", revealColor); leftRevealLine.setAttribute("stroke-width", revealStrokeWidth); leftRevealLine.setAttribute("stroke-dasharray", revealDashArray);
-            svg.appendChild(leftRevealLine);
-
-            // Right reveal vertical line
-            const rightRevealLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
-            rightRevealLine.setAttribute("x1", openingRight); rightRevealLine.setAttribute("y1", openingTop);
-            rightRevealLine.setAttribute("x2", openingRight); rightRevealLine.setAttribute("y2", openingBottom);
-            rightRevealLine.setAttribute("stroke", revealColor); rightRevealLine.setAttribute("stroke-width", revealStrokeWidth); rightRevealLine.setAttribute("stroke-dasharray", revealDashArray);
-            svg.appendChild(rightRevealLine);
-
-             // Top reveal horizontal line
-            const topRevealLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
-            topRevealLine.setAttribute("x1", openingLeft); topRevealLine.setAttribute("y1", openingTop);
-            topRevealLine.setAttribute("x2", openingRight); topRevealLine.setAttribute("y2", openingTop);
-            topRevealLine.setAttribute("stroke", revealColor); topRevealLine.setAttribute("stroke-width", revealStrokeWidth); topRevealLine.setAttribute("stroke-dasharray", revealDashArray);
-            svg.appendChild(topRevealLine);
-
-            // --- Add ANNOTATIONS ---
-             // Helper function for text elements
-            function createText(x, y, content, color, anchor = "middle", rotation = 0, fontWeight = "normal", fontSize = "11px") { // Smaller default font
+            function createText(x, y, content, color, anchor = "middle", rotation = 0, fontWeight = "normal", fontSize = "11px", cssClass = null) { // Add cssClass parameter
+                const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                if(cssClass) { group.setAttribute("class", cssClass); } // Apply class to group
+                if (rotation !== 0) { group.setAttribute("transform", `rotate(${rotation}, ${x}, ${y})`); }
                 const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                text.setAttribute("x", x);
-                text.setAttribute("y", y);
-                text.setAttribute("fill", color);
-                text.setAttribute("text-anchor", anchor);
-                text.setAttribute("font-size", fontSize);
-                text.setAttribute("font-weight", fontWeight);
-                text.setAttribute("dominant-baseline", "middle"); // Better vertical alignment
-                 text.style.textShadow = "1px 1px 2px white, -1px -1px 2px white, 1px -1px 2px white, -1px 1px 2px white"; // Basic white outline
-                if (rotation !== 0) {
-                    text.setAttribute("transform", `rotate(${rotation}, ${x}, ${y})`);
-                }
+                text.setAttribute("x", rotation !== 0 ? 0 : x); text.setAttribute("y", rotation !== 0 ? 0 : y);
+                text.setAttribute("fill", color); text.setAttribute("text-anchor", anchor); text.setAttribute("font-size", fontSize); text.setAttribute("font-weight", fontWeight); text.setAttribute("dominant-baseline", "middle");
                 text.textContent = content;
-                return text;
+                group.appendChild(text);
+                return group;
             }
 
-             const outputColor = "#1E8449"; // Darker green
-             const inputColor = "#C0392B"; // Darker red
-             const labelOffset = 12; // Distance labels sit from lines/edges
-             const textCenterY = (openingTop + openingBottom) / 2;
-
-            // OUTPUTS (Green)
-            const verticalLongSide = jambHeight - jambWidth + reveal + casingWidth; // For label
-
-             // Left Vertical Casing (Long Side)
-            svg.appendChild(createText(
-                 casingLeftOuter - labelOffset, textCenterY,
-                 formatMeasurement(verticalLongSide),
-                 outputColor, "end", -90, "bold"
-            ));
-
-            // Right Vertical Casing (Long Side)
-             svg.appendChild(createText(
-                 casingRightOuter + labelOffset, textCenterY,
-                 formatMeasurement(verticalLongSide),
-                 outputColor, "start", -90, "bold" // Note: -90 reads bottom-to-top on the right
-             ));
-
-            // Header Casing (Long Side)
-            svg.appendChild(createText(
-                 (casingLeftOuter + casingRightOuter) / 2, casingTopOuter - labelOffset,
-                 formatMeasurement(calculatedHeaderLongSide),
-                 outputColor, "middle", 0, "bold"
-            ));
-
-
-            // INPUTS & DIMENSIONS
-            const dimLineOffset = 25;
-            const dimLineColor = "#707B7C"; // Grey for dimension lines
-
-            // Dimension Line Helper
-            function drawDimLine(x1, y1, x2, y2, label, labelX, labelY, labelRot=0, isVertical=false) {
-                 const group = document.createElementNS("http.www.w3.org/2000/svg", "g");
-                 const line = document.createElementNS("http.www.w3.org/2000/svg", "line");
-                 line.setAttribute("x1", x1); line.setAttribute("y1", y1); line.setAttribute("x2", x2); line.setAttribute("y2", y2);
-                 line.setAttribute("stroke", dimLineColor); line.setAttribute("stroke-width", "1");
-                 line.setAttribute("marker-start", "url(#arrow)"); line.setAttribute("marker-end", "url(#arrow)");
-                 group.appendChild(line);
-                 group.appendChild(createText(labelX, labelY, label, inputColor, "middle", labelRot, "bold", "10px"));
+            function drawDimLine(x1, y1, x2, y2, label, labelX, labelY, labelRot = 0) {
+                 const group = createSVGElement('g');
+                 group.appendChild(createSVGElement('line', { x1: x1, y1: y1, x2: x2, y2: y2, stroke: dimLineColor, 'stroke-width': 1, 'marker-start': "url(#arrow)", 'marker-end': "url(#arrow)" }));
+                 group.appendChild(createText(labelX, labelY, label, inputColor, "middle", labelRot, "bold", "10px", "dim-label")); // Add class
                  return group;
             }
 
-             // Define arrowhead marker
-             const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
-             const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
-             marker.setAttribute("id", "arrow");
-             marker.setAttribute("viewBox", "0 0 10 10");
-             marker.setAttribute("refX", "5"); marker.setAttribute("refY", "5");
-             marker.setAttribute("markerWidth", "4"); marker.setAttribute("markerHeight", "4"); // Smaller arrow
-             marker.setAttribute("orient", "auto-start-reverse");
-             const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-             path.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
-             path.setAttribute("fill", dimLineColor);
-             marker.appendChild(path);
-             defs.appendChild(marker);
-             svg.insertBefore(defs, svg.firstChild); // Add defs at the beginning
+             if (!svg.querySelector("defs #arrow")) {
+                 const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+                 const marker = createSVGElement('marker', { id: "arrow", viewBox: "0 0 10 10", refX: "5", refY: "5", markerWidth: "4", markerHeight: "4", orient: "auto-start-reverse" });
+                 marker.appendChild(createSVGElement('path', { d: "M 0 0 L 10 5 L 0 10 z", fill: dimLineColor }));
+                 defs.appendChild(marker); svg.insertBefore(defs, svg.firstChild);
+             }
 
+            svg.appendChild(createText(casingCoords.topLeftOuter.x - labelOffset, textCenterY, formatMeasurement(calculatedVerticalLongSide), outputColor, "end", -90, "bold", "11px", "output-label"));
+            svg.appendChild(createText(casingCoords.topRightOuter.x + labelOffset, textCenterY, formatMeasurement(calculatedVerticalLongSide), outputColor, "start", -90, "bold", "11px", "output-label"));
+            svg.appendChild(createText((casingCoords.topLeftOuter.x + casingCoords.topRightOuter.x) / 2, casingCoords.topLeftOuter.y - labelOffset, formatMeasurement(calculatedHeaderLongSide), outputColor, "middle", 0, "bold", "11px", "output-label"));
 
-            // Jamb Height Dim Line
-            const jambH_x = jambOuterLeft - dimLineOffset;
-             svg.appendChild(drawDimLine(
-                jambH_x, jambOuterTop, jambH_x, jambOuterBottom,
-                formatMeasurement(jambHeight),
-                jambH_x - 5, textCenterY, -90, true
-             ));
+            const opCoords = { topLeft: applyOffset(openingLeftX, openingTopY), topRight: applyOffset(openingRightX, openingTopY), bottomLeft: applyOffset(openingLeftX, openingBottomY), bottomRight: applyOffset(openingRightX, openingBottomY), };
+            const opH_x = opCoords.topLeft.x - dimLineOffset / 2;
+            svg.appendChild(drawDimLine( opH_x, opCoords.topLeft.y, opH_x, opCoords.bottomLeft.y, formatMeasurement(openingH), opH_x - 5, (opCoords.topLeft.y + opCoords.bottomLeft.y) / 2, -90 ));
+            const opW_y = casingCoords.bottomLeftOuter.y + dimLineOffset;
+            svg.appendChild(drawDimLine( opCoords.bottomLeft.x, opW_y, opCoords.bottomRight.x, opW_y, formatMeasurement(openingW), (opCoords.bottomLeft.x + opCoords.bottomRight.x) / 2, opW_y + 5, 0 ));
 
-             // Opening Width Dim Line
-             const openingW_y = openingBottom + dimLineOffset;
-             svg.appendChild(drawDimLine(
-                 openingLeft, openingW_y, openingRight, openingW_y,
-                 formatMeasurement(doorWidth),
-                 (openingLeft + openingRight) / 2, openingW_y + 5, 0, false
-             ));
-
-
-             // Other Input Labels (Reveal, JambW, CasingW) near top-left corner for reference
-             const detailLabelX = jambOuterLeft + 5; // Small offset from outer jamb edge
-             const detailLabelYStart = jambOuterTop + 15;
-             const detailLabelYStep = 15;
-
-             svg.appendChild(createText(detailLabelX, detailLabelYStart, "Jamb: " + formatMeasurement(jambWidth), inputColor, "start", 0, "normal", "10px"));
-             svg.appendChild(createText(detailLabelX, detailLabelYStart + detailLabelYStep, "Reveal: " + formatMeasurement(reveal), revealColor, "start", 0, "normal", "10px"));
-             svg.appendChild(createText(detailLabelX, detailLabelYStart + 2 * detailLabelYStep, "Casing: " + formatMeasurement(casingWidth), casingStroke, "start", 0, "normal", "10px"));
-
-
-            // Legend (Optional - can get cluttered)
-            // svg.appendChild(createText(padding, svgHeight - padding + 15, "● Inputs", inputColor, "start"));
-            // svg.appendChild(createText(padding + 80, svgHeight - padding + 15, "● Reveal", revealColor, "start"));
-            // svg.appendChild(createText(padding + 160, svgHeight - padding + 15, "● Outputs (Cut Sizes)", outputColor, "start"));
-
+            const detailLabelX = jambCoords.topLeftInner.x + scOpeningW / 2; const detailLabelYStart = jambCoords.topLeftInner.y + 30; const detailLabelYStep = 18;
+            svg.appendChild(createText(detailLabelX, detailLabelYStart, "Jamb: " + formatMeasurement(jambW), jambStroke, "middle", 0, "normal", "11px", "detail-label"));
+            svg.appendChild(createText(detailLabelX, detailLabelYStart + detailLabelYStep, "Reveal: " + formatMeasurement(reveal), revealColor, "middle", 0, "normal", "11px", "detail-label"));
+            svg.appendChild(createText(detailLabelX, detailLabelYStart + 2 * detailLabelYStep, "Casing: " + formatMeasurement(casingW), casingStroke, "middle", 0, "normal", "11px", "detail-label"));
 
             container.appendChild(svg);
         }
 
-
         // --- Event Listeners ---
         document.addEventListener('DOMContentLoaded', function() {
-            // Initial calculation
-            calculateCasingSizes();
-
-            // Add click event for calculate button
+            calculateCasingSizes(); // Initial calculation
             document.getElementById('calculateBtn').addEventListener('click', calculateCasingSizes);
-
-            // Add input events for real-time updates (on change is usually sufficient)
             const inputElements = document.querySelectorAll('.input-section input');
             inputElements.forEach(input => {
                 input.addEventListener('change', calculateCasingSizes);
-                input.addEventListener('keyup', (event) => { // Also calculate on Enter key
-                    if (event.key === 'Enter') {
-                        calculateCasingSizes();
-                    }
-                });
+                input.addEventListener('keyup', (event) => { if (event.key === 'Enter') { calculateCasingSizes(); } });
             });
-
-            // Optional debug info toggle
+             // Optional debug info toggle
              document.querySelector('h1').addEventListener('dblclick', function() {
                  const debugElement = document.getElementById('debugInfo');
                  debugElement.style.display = debugElement.style.display === 'none' ? 'block' : 'none';
